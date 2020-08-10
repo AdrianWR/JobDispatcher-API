@@ -1,0 +1,234 @@
+openapi: 3.0.2
+info:
+  version: 0.0.1
+  title: Centaur JobDispatcher API
+  description: >
+
+    # Introduction
+
+
+    This API aims to manage and ease the process of submitting jobs to a
+    CENTAURminer data mining workflow on the Google Cloud Platform. This API is
+    a part of the aivscovid19.org initiative, to make data on BioMedBERT
+    understable and easy to use for health professionals and everyone. 
+
+
+    ## Basic Instructions 
+
+
+    The Centaur JobDispatcher API follows an asynchronous workflow. Every time
+    someone sends a POST request to submit a mining job, it will be replied an
+    unique identifier to track your job status with the GET method. The possible
+    status to follow could be:
+
+
+    * **Pending**: a job validated by the system, but not yet started;
+
+    * **Working**: a job submitted to execution and currenlty being processed by
+    the system;
+
+    * **Finished**: a job with execution done and data already sent to BigQuery.
+  license:
+    name: MIT
+    url: 'https://raw.githubusercontent.com/Simonsays095/CENTAURminer/master/LICENSE'
+  contact:
+    name: Adrian Roque
+    url: 'https://github.com/AdrianWR'
+    email: adrian.w.roque@gmail.com
+tags:
+  - name: jobs
+    description: Send and get status of data mining jobs
+    externalDocs:
+      description: Find out more
+      url: 'https://github.com/Simonsays095/CENTAURminer'
+servers:
+  - url: api.centaur.com/v1/jobs
+security:
+  - googleAuth:
+      - read_jobs
+      - write_jobs
+      - delete_jobs
+paths:
+  /:
+    get:
+      description: Return all current jobs status
+      operationId: list_all_jobs
+      tags:
+        - jobs
+      responses:
+        '202':
+          description: All current jobs listed
+          content:
+            application/json: {}
+    post:
+      description: Create mining job at server
+      operationId: create_job
+      tags:
+        - jobs
+      requestBody:
+        description: Job information to submit
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewJob'
+            examples:
+              scielo:
+                value:
+                  domain: scielo.br
+                  keywords:
+                    - medicine
+                    - virus
+                  limit: 100
+      responses:
+        '202':
+          description: Mining job succesfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobToken'
+              examples:
+                scielo:
+                  value:
+                    url: https/api.centaur.com/v1/78h2e7f
+                    token: 78h2e7f
+  '/{id}':
+    get:
+      description: Return job status with specified ID
+      operationId: list_job
+      tags:
+        - jobs
+      parameters:
+        - name: id
+          in: path
+          description: ID of the job to fetch information
+          required: true
+          schema:
+            type: integer
+            format: int64
+          examples:
+            scielo:
+              value:
+                id: 78h2e7f
+      responses:
+        '200':
+          description: Selected job listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobDescription'
+              examples:
+                scielo:
+                  value:
+                    status: Pending
+                    token: 78h2e7f
+                    owner:
+                      usename: Adrian Roque
+                      email: adrian.w.roque@gmail.com
+                    requestTime: '2020-08-10T11:40:47-03:00'
+                    startTime: 'NULL'
+                    finishTime: 'NULL'
+                    request:
+                      domain: scielo.br
+                      keywords:
+                        - medicine
+                        - virus
+                      limit: 100
+    delete:
+      description: Stop and delete job with specified ID
+      operationId: delete_job
+      tags:
+        - jobs
+      parameters:
+        - name: id
+          in: path
+          description: ID of the job to delete
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Succesfully delete data with specified ID
+          content:
+            application/json:
+              examples:
+                No Content:
+                  value: '{}'
+components:
+  schemas:
+    NewJob:
+      type: object
+      required:
+        - domain
+        - limit
+      properties:
+        domain:
+          type: string
+        limit:
+          type: integer
+          format: int64
+        keywords:
+          type: array
+          items:
+            type: string
+    JobToken:
+      type: object
+      required:
+        - url
+        - token
+      properties:
+        url:
+          type: string
+          format: uri
+        token:
+          type: string
+          format: byte
+    JobDescription:
+      type: object
+      required:
+        - status
+        - token
+      properties:
+        status:
+          type: string
+          enum:
+            - Pending
+            - Working
+            - Finished
+        token:
+          type: string
+          format: byte
+        owner:
+          type: object
+          properties:
+            username:
+              type: string
+            email:
+              type: string
+              format: email
+        requestTime:
+          type: string
+          format: date-time
+        startTime:
+          type: string
+          format: date-time
+        finishTime:
+          type: string
+          format: date-time
+        request:
+          type: object
+          allOf:
+            - $ref: '#/components/schemas/NewJob'
+  securitySchemes:
+    googleAuth:
+      type: oauth2
+      description: authorizationCode authentication procedure
+      flows:
+        authorizationCode:
+          tokenUrl: nothing-so-far
+          authorizationUrl: 'https://api.example.com/oauth2/authorize'
+          scopes:
+            read_jobs: read jobs from server
+            write_jobs: submit jobs to be executed
+            delete_jobs: delete not-finished jobs
